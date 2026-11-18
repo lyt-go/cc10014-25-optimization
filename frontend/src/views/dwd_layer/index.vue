@@ -48,6 +48,14 @@
             >
               {{ action }}
             </button>
+            <button
+              class="link"
+              type="button"
+              :data-testid="`backfill-result-${row.id}`"
+              @click="openBackfillResult(row)"
+            >
+              补数结果集
+            </button>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -72,6 +80,35 @@
       </form>
     </div>
 
+    <div v-if="backfillResult" class="modal-backdrop" data-testid="backfill-modal" @click.self="backfillResult = null">
+      <div class="modal" style="max-width:760px">
+        <h3>补数分区结果集 · {{ backfillResult.目标表名 }} <small style="color:var(--muted)">v{{ backfillResult.版本号 }}</small></h3>
+        <p>
+          <strong>完成水位：</strong><span data-testid="backfill-watermark">{{ backfillResult.完成水位 || '—' }}</span>
+          ｜ 完成分区 {{ backfillResult.完成分区.length }} 个
+          ｜ 失败分区 {{ backfillResult.失败分区.length }} 个
+        </p>
+        <table class="data-table">
+          <thead><tr><th>补数任务</th><th>覆盖窗口</th><th>状态</th><th>完成水位</th><th>失败分区</th></tr></thead>
+          <tbody>
+            <tr v-for="job in backfillJobList" :key="job.任务编号">
+              <td>{{ job.任务编号 }}</td>
+              <td>{{ job.起始日期 }} ~ {{ job.截止日期 }}</td>
+              <td>{{ job.状态 }}</td>
+              <td>{{ job.完成水位 || '—' }}</td>
+              <td>{{ (job.失败分区 || []).join('、') || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="backfillResult.边界冲突?.length" class="error-text">
+          存在 {{ backfillResult.边界冲突.length }} 处边界重叠冲突，生效版本：{{ backfillResult.边界冲突.map((c: any) => c.生效版本).join('、') }}
+        </p>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px">
+          <button class="btn primary" type="button" @click="backfillResult = null">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条明细层管理记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -83,7 +120,6 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { request } from '@/api/client'
-
 type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/dwd_layer'
@@ -181,6 +217,21 @@ async function reload() {
     total.value = payload.total ?? rows.value.length
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '明细层管理列表读取失败'
+  }
+}
+
+const backfillResult = ref<Record<string, any> | null>(null)
+const backfillJobList = computed(() => Object.values(backfillResult.value?.任务结果 ?? {}) as Record<string, any>[])
+
+async function openBackfillResult(row: Row) {
+  errorMessage.value = ''
+  try {
+    const response = await request(`${ENDPOINT}/${row.id}/backfill-result`)
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.detail || '补数分区结果集读取失败')
+    backfillResult.value = payload
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '补数分区结果集读取失败'
   }
 }
 

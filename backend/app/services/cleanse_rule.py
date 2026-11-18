@@ -10,8 +10,8 @@ MODULE = "cleanse_rule"
 LIST_FIELDS = ["策略编号", "目标字段", "空值处理", "异常阈值", "正则表达式", "替换值", "策略版本", "执行顺序"]
 REQUIRED_FIELDS = ["策略编号", "目标字段"]
 STATUS_ORDER = ["草稿", "待校验", "已生效", "已停用"]
-ACTION_RULES = {"提交校验": "待校验", "标记生效": "已生效", "停用规则": "已停用"}
-NEGATIVE_ACTIONS = ["停用规则"]
+ACTION_RULES = {"提交校验": "待校验", "标记生效": "已生效", "停用规则": "已停用", "停用策略": "已停用"}
+NEGATIVE_ACTIONS = ["停用规则", "停用策略"]
 
 
 class CleanseRuleService:

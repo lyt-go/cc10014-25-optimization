@@ -40,6 +40,9 @@ def _clear_all():
     store._snapshot_data.clear()
     store._archive_records.clear()
     store._backfill_partitions.clear()
+    store.clear_backfill_results()
+    from app.services.backfill_job import FAIL_PARTITIONS as _FAIL
+    _FAIL.clear()
     store._versions.clear()
 
 # ---------------------------------------------------------------------------

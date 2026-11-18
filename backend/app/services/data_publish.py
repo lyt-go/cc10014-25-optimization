@@ -9,9 +9,9 @@ from app.store import store
 MODULE = "data_publish"
 LIST_FIELDS = ["版本编号", "数据集名称", "发布范围", "查询参数", "响应字段", "缓存秒数", "分页上限", "消费应用"]
 REQUIRED_FIELDS = ["版本编号", "数据集名称"]
-STATUS_ORDER = ["草稿", "待校验", "已发布", "已下线"]
-ACTION_RULES = {"提交校验": "待校验", "确认发布": "已发布", "标记下线": "已下线"}
-NEGATIVE_ACTIONS = []
+STATUS_ORDER = ["草稿", "待校验", "已发布", "已下线", "已撤回"]
+ACTION_RULES = {"提交校验": "待校验", "确认发布": "已发布", "标记下线": "已下线", "撤回版本": "已撤回"}
+NEGATIVE_ACTIONS = ["撤回版本"]
 
 
 class DataPublishService:

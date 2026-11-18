@@ -107,3 +107,12 @@ def get_table_data(entry_id: int) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"明细表 {entry_id} 不存在")
     data = service.get_table_data(entry.get("表名称", ""))
     return {"items": data}
+
+
+@router.get("/{entry_id}/backfill-result")
+def get_backfill_result(entry_id: int) -> dict[str, Any]:
+    """跨模块联动：回查该DWD表对应的补数分区结果集（完成分区/失败分区/完成水位）。"""
+    result = service.get_backfill_result(entry_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"明细表 {entry_id} 暂无补数分区结果集，请先在补数调度执行任务")
+    return result

@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+import threading
+from copy import deepcopy
 from datetime import datetime
 from typing import Any
 
@@ -27,8 +29,13 @@ class Store:
         self._snapshot_data: dict[str, dict[str, Any]] = {}
         # 归档记录
         self._archive_records: list[dict[str, Any]] = []
-        # 补数区间记录
+        # 补数区间记录（按补数任务编号）
         self._backfill_partitions: dict[str, list[dict[str, Any]]] = {}
+        # 补数分区结果集：按目标表名保存唯一完整版本
+        self._backfill_results: dict[str, dict[str, Any]] = {}
+        # 结果集写锁：同一张表的并发批量写入串行化，只保留一个完整版本
+        self._backfill_locks: dict[str, threading.RLock] = {}
+        self._backfill_locks_guard = threading.Lock()
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
@@ -79,6 +86,16 @@ class Store:
 
     def append_table_rows(self, table_name: str, rows: list[dict[str, Any]]) -> None:
         self._table_data.setdefault(table_name, []).extend(rows)
+
+    def upsert_table_partition(
+        self, table_name: str, partition_field: str, partition_value: str,
+        rows: list[dict[str, Any]],
+    ) -> None:
+        """分区级写入：只覆盖目标分区，相邻补数任务重叠扫描时不再覆盖其他分区/其他天结果。"""
+        current = self._table_data.setdefault(table_name, [])
+        kept = [row for row in current if str(row.get(partition_field, "")) != str(partition_value)]
+        kept.extend(rows)
+        self._table_data[table_name] = kept
 
     # ---- 版本管理 ----
 
@@ -158,13 +175,55 @@ class Store:
     def get_archive_records(self) -> list[dict[str, Any]]:
         return list(self._archive_records)
 
-    # ---- 补数分区 ----
+    # ---- 补数分区（任务级，向后兼容） ----
 
     def save_backfill_partition(self, job_id: str, partition: dict[str, Any]) -> None:
         self._backfill_partitions.setdefault(job_id, []).append(partition)
 
     def get_backfill_partitions(self, job_id: str) -> list[dict[str, Any]]:
         return list(self._backfill_partitions.get(job_id, []))
+
+    # ---- 补数分区结果集（按表，唯一完整版本，并发安全） ----
+
+    REQUIRED_RESULT_KEYS = ("目标表名", "分区字段", "完成水位", "完成分区", "失败分区", "任务结果")
+
+    def backfill_lock(self, table_name: str) -> threading.RLock:
+        """同一张表的结果集写入共用一把锁，批量并发写入被串行化。"""
+        with self._backfill_locks_guard:
+            lock = self._backfill_locks.get(table_name)
+            if lock is None:
+                lock = threading.RLock()
+                self._backfill_locks[table_name] = lock
+            return lock
+
+    def get_backfill_result(self, table_name: str) -> dict[str, Any] | None:
+        result = self._backfill_results.get(table_name)
+        return deepcopy(result) if result is not None else None
+
+    def list_backfill_results(self) -> list[dict[str, Any]]:
+        return [deepcopy(result) for result in self._backfill_results.values()]
+
+    def commit_backfill_result(self, table_name: str, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """原子提交结果集完整版本。
+
+        - 只接受包含完成分区、失败分区、完成水位、任务结果的完整快照，
+          半成品快照直接拒绝，保证库里永远只有一个完整版本；
+        - 版本号单调递增并整体替换旧快照（旧版本不残留为并行版本）；
+        - 调用方须持有所在表的 backfill_lock，本方法在锁内完成换版。
+        """
+        missing = [key for key in self.REQUIRED_RESULT_KEYS if key not in snapshot]
+        if missing:
+            raise ValueError(f"补数分区结果集缺少完整字段：{'、'.join(missing)}")
+        previous = self._backfill_results.get(table_name)
+        stored = deepcopy(snapshot)
+        stored["目标表名"] = table_name
+        stored["版本号"] = int(previous["版本号"]) + 1 if previous else 1
+        stored["更新时间"] = datetime.now().isoformat()
+        self._backfill_results[table_name] = stored
+        return deepcopy(stored)
+
+    def clear_backfill_results(self) -> None:
+        self._backfill_results.clear()
 
 
 store = Store()

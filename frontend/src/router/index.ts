@@ -14,6 +14,7 @@ const PartitionMgr = () => import('@/views/partition_mgr/index.vue')
 const QualityCheck = () => import('@/views/quality_check/index.vue')
 const LineageTrack = () => import('@/views/lineage_track/index.vue')
 const BackfillJob = () => import('@/views/backfill_job/index.vue')
+const BackfillResult = () => import('@/views/backfill_result/index.vue')
 const TableCompare = () => import('@/views/table_compare/index.vue')
 const SchemaRegistry = () => import('@/views/schema_registry/index.vue')
 const DataPublish = () => import('@/views/data_publish/index.vue')
@@ -37,6 +38,7 @@ const router = createRouter({
     { path: '/quality_check', name: 'quality_check', component: QualityCheck },
     { path: '/lineage_track', name: 'lineage_track', component: LineageTrack },
     { path: '/backfill_job', name: 'backfill_job', component: BackfillJob },
+    { path: '/backfill_result', name: 'backfill_result', component: BackfillResult },
     { path: '/table_compare', name: 'table_compare', component: TableCompare },
     { path: '/schema_registry', name: 'schema_registry', component: SchemaRegistry },
     { path: '/data_publish', name: 'data_publish', component: DataPublish },

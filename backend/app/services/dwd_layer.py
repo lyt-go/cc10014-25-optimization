@@ -140,3 +140,10 @@ class DwdLayerService:
 
     def get_table_data(self, table_name: str) -> list[dict[str, Any]]:
         return store.table_rows(table_name)
+
+    def get_backfill_result(self, entry_id: int) -> dict[str, Any] | None:
+        """明细层与补数调度跨模块联动：按DWD表回查补数分区结果集。"""
+        entry = self.get_entry(entry_id)
+        if not entry:
+            return None
+        return store.get_backfill_result(str(entry.get("表名称", "")))
